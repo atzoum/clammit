@@ -8,11 +8,12 @@ package main
 
 import (
 	"fmt"
-	clamd "github.com/dutchcoders/go-clamd"
 	"io"
 	"mime"
 	"mime/multipart"
 	"net/http"
+
+	clamd "github.com/dutchcoders/go-clamd"
 )
 
 //
@@ -46,59 +47,75 @@ func (c *ClamInterceptor) Handle(w http.ResponseWriter, req *http.Request, body 
 	//
 	// Find any attachments
 	//
-	content_type, params, err := mime.ParseMediaType(req.Header.Get("Content-Type"))
+	contentType, params, err := mime.ParseMediaType(req.Header.Get("Content-Type"))
 	if err != nil {
 		ctx.Logger.Println("Unable to parse media type:", err)
 		return false
 	}
-	if content_type != "multipart/form-data" {
-		ctx.Logger.Println("Content type is not multipart/form-data: ", content_type)
-		return false
-	}
-	boundary := params["boundary"]
-	if boundary == "" {
-		ctx.Logger.Println("Multipart boundary is not defined")
-		return false
-	}
 
-	reader := multipart.NewReader(body, boundary)
+	if contentType == "multipart/form-data" {
+		boundary := params["boundary"]
+		if boundary == "" {
+			ctx.Logger.Println("Multipart boundary is not defined")
+			return false
+		}
 
-	//
-	// Scan them
-	//
-	count := 0
-	for {
-		if part, err := reader.NextPart(); err != nil {
-			if err == io.EOF {
-				break // all done
-			}
-			ctx.Logger.Println("Error parsing multipart form:", err)
-			http.Error(w, "Bad Request", 400)
-			return true
-		} else {
-			count++
-			if part.FileName() != "" {
-				defer part.Close()
-				if ctx.Config.App.Debug {
-					ctx.Logger.Println("Scanning", part.FileName())
+		reader := multipart.NewReader(body, boundary)
+
+		//
+		// Scan them
+		//
+		count := 0
+		for {
+			if part, err := reader.NextPart(); err != nil {
+				if err == io.EOF {
+					break // all done
 				}
-				if hasVirus, err := c.Scan(part); err != nil {
-					ctx.Logger.Printf("Unable to scan file (%s): %v\n", part.FileName(), err)
-					http.Error(w, "Internal Server Error", 500)
-					return true
-				} else if hasVirus {
-					w.WriteHeader(c.VirusStatusCode)
-					w.Write([]byte(fmt.Sprintf("File %s has a virus!", part.FileName())))
-					return true
+				ctx.Logger.Println("Error parsing multipart form:", err)
+				http.Error(w, "Bad Request", 400)
+				return true
+			} else {
+				count++
+				if part.FileName() != "" {
+					defer part.Close()
+					if ctx.Config.App.Debug {
+						ctx.Logger.Println("Scanning", part.FileName())
+					}
+					if hasVirus, err := c.Scan(part); err != nil {
+						ctx.Logger.Printf("Unable to scan file (%s): %v\n", part.FileName(), err)
+						http.Error(w, "Internal Server Error", 500)
+						return true
+					} else if hasVirus {
+						w.WriteHeader(c.VirusStatusCode)
+						w.Write([]byte(fmt.Sprintf("File %s has a virus!", part.FileName())))
+						return true
+					}
 				}
 			}
 		}
-	}
 
-	if ctx.Config.App.Debug {
-		ctx.Logger.Printf("Processed %d form parts", count)
-	}
+		if ctx.Config.App.Debug {
+			ctx.Logger.Printf("Processed %d form parts", count)
+		}
 
+	} else {
+		_, params, err := mime.ParseMediaType(req.Header.Get("Content-Disposition"))
+		if err != nil {
+			ctx.Logger.Println("Unable to parse content disposition:", err)
+			return false
+		}
+		if params["filename"] != "" {
+			if hasVirus, err := c.Scan(req.Body); err != nil {
+				ctx.Logger.Printf("Unable to scan file (%s): %v\n", params["filename"], err)
+				http.Error(w, "Internal Server Error", 500)
+				return true
+			} else if hasVirus {
+				w.WriteHeader(c.VirusStatusCode)
+				w.Write([]byte(fmt.Sprintf("File %s has a virus!", params["filename"])))
+				return true
+			}
+		}
+	}
 	return false
 }
 

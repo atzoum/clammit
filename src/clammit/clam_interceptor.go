@@ -105,7 +105,7 @@ func (c *ClamInterceptor) Handle(w http.ResponseWriter, req *http.Request, body 
 			return false
 		}
 		if params["filename"] != "" {
-			if hasVirus, err := c.Scan(req.Body); err != nil {
+			if hasVirus, err := c.Scan(body); err != nil {
 				ctx.Logger.Printf("Unable to scan file (%s): %v\n", params["filename"], err)
 				http.Error(w, "Internal Server Error", 500)
 				return true

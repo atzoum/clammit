@@ -134,6 +134,9 @@ func (c *ClamInterceptor) Scan(reader io.Reader) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	if ctx.Config.App.Debug {
+		ctx.Logger.Println("Got response from clamav: ", response)
+	}
 	hasVirus := false
 	for s := range response {
 		if s != "stream: OK" {

@@ -1,4 +1,5 @@
 build:
+  main: clammit
   binary_name: clammit
   goos:
     - linux

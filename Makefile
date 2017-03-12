@@ -26,4 +26,4 @@ testify:
 	[ -d src/gopkg.in/testify.v1 ] || go get gopkg.in/stretchr/testify.v1
 
 release:
-	cd src/clammit && curl -sL https://git.io/goreleaser | bash
+	curl -sL https://git.io/goreleaser | bash

@@ -1,6 +1,6 @@
-ldflags: -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}} -linkmode external -extldflags "-static"
 build:
   main: clammit
+  ldflags: -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}} -linkmode external -extldflags "-static"
   binary_name: clammit
   goos:
     - linux
